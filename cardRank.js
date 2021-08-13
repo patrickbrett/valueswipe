@@ -139,37 +139,38 @@ const handleComparison = async (first, second, indexMap) => {
     first.i.add(second);
     second.o.add(first);
   }
-}
+};
 
-const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
-  indexMap = {};
+const buildIndexMap = (vals) => {
+  const indexMap = {};
   actualOrder.forEach((v, i) => {
     indexMap[v] = i;
   });
+  return indexMap;
+};
 
-  let nodes = actualOrder.map((val) => new Node(val));
-
-  await pairRankNodes(nodes);
-
-  let topSorted = topSort(nodes);
-
-  let hasSortedTopN = false;
-  let hasIdentifiedTopN = false;
-  while (
-    (findTop === null && topSorted.length < nodes.length) ||
-    (findTop !== null && findTopOrdered && !hasSortedTopN) ||
-    (findTop !== null && !findTopOrdered && !hasIdentifiedTopN)
-  ) {
-    if (findTop === null) {
-      topSorted = shuffle(topSorted);
-    }
-    let seenCount = 0;
+const handleFullSort = async (nodes, topSorted, indexMap) => {
+  while (topSorted.length < nodes.length) {
+    topSorted = shuffle(topSorted);
     for (let rank of topSorted) {
-      seenCount += rank.length;
       if (rank.length < 2) {
         continue;
       }
-      if (!findTopOrdered && seenCount < findTop) {
+      const [first, second] = rank;
+      await handleComparison(first, second, indexMap);
+      break;
+    }
+    if (log) console.log(formatList(topSorted));
+    topSorted = topSort(nodes);
+  }
+  return topSorted;
+};
+
+const handleOrderedPartialSort = async (nodes, topSorted, indexMap) => {
+  let hasSortedTopN = false;
+  while (!hasSortedTopN) {
+    for (let rank of topSorted) {
+      if (rank.length < 2) {
         continue;
       }
       const [first, second] = rank;
@@ -181,8 +182,49 @@ const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
     hasSortedTopN = topSorted
       .filter((v, i) => i < findTop)
       .every((x) => x.length === 1);
+  }
 
+  return topSorted;
+};
+
+const handleUnorderedPartialSort = async (nodes, topSorted, indexMap) => {
+  let hasIdentifiedTopN = false;
+  while (!hasIdentifiedTopN) {
+    let seenCount = 0;
+    for (let rank of topSorted) {
+      seenCount += rank.length;
+      if (rank.length < 2 || seenCount < findTop) {
+        continue;
+      }
+      const [first, second] = rank;
+      await handleComparison(first, second, indexMap);
+      break;
+    }
+    if (log) console.log(formatList(topSorted));
+
+    topSorted = topSort(nodes);
     hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
+  }
+};
+
+const cardRank = async (values, findTop = null, findTopOrdered = true) => {
+  const indexMap = buildIndexMap(values);
+
+  let nodes = values.map((val) => new Node(val));
+
+  await pairRankNodes(nodes);
+
+  let topSorted = topSort(nodes);
+
+  if (findTop === null) {
+    // Full sort
+    await handleFullSort(nodes, topSorted, indexMap);
+  } else if (findTopOrdered) {
+    // Find top N, ordered
+    await handleOrderedPartialSort(nodes, topSorted, indexMap, findTop);
+  } else {
+    // Find top N, unordered
+    await handleUnorderedPartialSort(nodes, topSorted, indexMap, findTop);
   }
 
   if (findTop === null) {
