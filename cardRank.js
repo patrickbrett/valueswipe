@@ -105,7 +105,7 @@ const formatList = (topSorted) => {
   return topSorted.map((x) => x.map((y) => y.val).join(","));
 };
 
-const cardRank = async (actualOrder, findTop = null) => {
+const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
   indexMap = {};
   actualOrder.forEach((v, i) => {
     indexMap[v] = i;
@@ -132,15 +132,22 @@ const cardRank = async (actualOrder, findTop = null) => {
   let topSorted = topSort(nodes);
 
   let hasSortedTopN = false;
+  let hasIdentifiedTopN = false;
   while (
     (findTop === null && topSorted.length < nodes.length) ||
-    (findTop !== null && !hasSortedTopN)
+    (findTop !== null && findTopOrdered && !hasSortedTopN) ||
+    (findTop !== null && !findTopOrdered && !hasIdentifiedTopN)
   ) {
     if (findTop === null) {
       topSorted = shuffle(topSorted);
     }
+    let seenCount = 0;
     for (let rank of topSorted) {
+      seenCount += rank.length;
       if (rank.length < 2) {
+        continue;
+      }
+      if (!findTopOrdered && seenCount < findTop) {
         continue;
       }
       const [first, second] = rank;
@@ -158,6 +165,16 @@ const cardRank = async (actualOrder, findTop = null) => {
     hasSortedTopN = topSorted
       .filter((v, i) => i < findTop)
       .every((x) => x.length === 1);
+
+    hasIdentifiedTopN = false;
+    seenCount = 0;
+    for (let i=0; i<topSorted.length; i++) {
+      seenCount += topSorted[i].length;
+      if (seenCount === findTop) {
+        hasIdentifiedTopN = true;
+        break;
+      }
+    }
   }
 
   if (findTop === null) {
@@ -168,7 +185,7 @@ const cardRank = async (actualOrder, findTop = null) => {
 };
 
 const { values } = yaml.load(fs.readFileSync("./values.yaml"));
-cardRank(values, 3).then((res) => {
+cardRank(values.filter((v, i) => i < 10), 3, false).then((res) => {
   console.log(res);
   console.log(`Comps: ${comparisons}`);
 });
