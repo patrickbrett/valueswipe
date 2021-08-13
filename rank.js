@@ -19,7 +19,7 @@ function askQuestion(query) {
 }
 
 let comparisons = 0;
-const log = false;
+const log = true;
 const ask = false;
 
 class Node {
@@ -105,7 +105,7 @@ const formatList = (topSorted) => {
   return topSorted.map((x) => x.map((y) => y.val).join(","));
 };
 
-const pairRankNodes = async (nodes) => {
+const pairRankNodes = async (nodes, indexMap) => {
   const len = nodes.length;
   const shuffled = shuffle(nodes);
 
@@ -143,7 +143,7 @@ const handleComparison = async (first, second, indexMap) => {
 
 const buildIndexMap = (vals) => {
   const indexMap = {};
-  actualOrder.forEach((v, i) => {
+  vals.forEach((v, i) => {
     indexMap[v] = i;
   });
   return indexMap;
@@ -161,7 +161,7 @@ const sortFirstPair = async (topSorted) => {
   if (log) console.log(formatList(topSorted));
 }
 
-const handleFullSort = async (nodes, topSorted, indexMap) => {
+const handleFullSort = async (nodes, topSorted) => {
   while (topSorted.length < nodes.length) {
     topSorted = shuffle(topSorted);
     await sortFirstPair(topSorted);
@@ -170,7 +170,7 @@ const handleFullSort = async (nodes, topSorted, indexMap) => {
   return topSorted;
 };
 
-const handleOrderedPartialSort = async (nodes, topSorted, indexMap) => {
+const handleOrderedPartialSort = async (nodes, topSorted, findTop) => {
   let hasSortedTopN = false;
   while (!hasSortedTopN) {
     sortFirstPair(topSorted);
@@ -183,7 +183,7 @@ const handleOrderedPartialSort = async (nodes, topSorted, indexMap) => {
   return topSorted;
 };
 
-const handleUnorderedPartialSort = async (nodes, topSorted, indexMap) => {
+const handleUnorderedPartialSort = async (nodes, topSorted, indexMap, findTop) => {
   let hasIdentifiedTopN = false;
   while (!hasIdentifiedTopN) {
     let seenCount = 0;
@@ -208,16 +208,16 @@ const cardRank = async (values, findTop = null, findTopOrdered = true) => {
 
   let nodes = values.map((val) => new Node(val));
 
-  await pairRankNodes(nodes);
+  await pairRankNodes(nodes, indexMap);
 
   let topSorted = topSort(nodes);
 
   if (findTop === null) {
     // Full sort
-    await handleFullSort(nodes, topSorted, indexMap);
+    await handleFullSort(nodes, topSorted);
   } else if (findTopOrdered) {
     // Find top N, ordered
-    await handleOrderedPartialSort(nodes, topSorted, indexMap, findTop);
+    await handleOrderedPartialSort(nodes, topSorted, findTop);
   } else {
     // Find top N, unordered
     await handleUnorderedPartialSort(nodes, topSorted, indexMap, findTop);
