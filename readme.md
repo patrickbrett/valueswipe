@@ -13,12 +13,7 @@ Watch this space!
 ## Run it
 
 ```
+cd frontend
 npm i
-node cardRank.js
-```
-
-Or the Python version (a bit older, this was the original prototype):
-
-```
-python3 cardrank.py
+npm start
 ```
