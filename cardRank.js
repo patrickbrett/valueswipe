@@ -149,18 +149,22 @@ const buildIndexMap = (vals) => {
   return indexMap;
 };
 
+const sortFirstPair = async (topSorted) => {
+  for (let rank of topSorted) {
+    if (rank.length < 2) {
+      continue;
+    }
+    const [first, second] = rank;
+    await handleComparison(first, second, indexMap);
+    break;
+  }
+  if (log) console.log(formatList(topSorted));
+}
+
 const handleFullSort = async (nodes, topSorted, indexMap) => {
   while (topSorted.length < nodes.length) {
     topSorted = shuffle(topSorted);
-    for (let rank of topSorted) {
-      if (rank.length < 2) {
-        continue;
-      }
-      const [first, second] = rank;
-      await handleComparison(first, second, indexMap);
-      break;
-    }
-    if (log) console.log(formatList(topSorted));
+    await sortFirstPair(topSorted);
     topSorted = topSort(nodes);
   }
   return topSorted;
@@ -169,15 +173,7 @@ const handleFullSort = async (nodes, topSorted, indexMap) => {
 const handleOrderedPartialSort = async (nodes, topSorted, indexMap) => {
   let hasSortedTopN = false;
   while (!hasSortedTopN) {
-    for (let rank of topSorted) {
-      if (rank.length < 2) {
-        continue;
-      }
-      const [first, second] = rank;
-      await handleComparison(first, second, indexMap);
-      break;
-    }
-    if (log) console.log(formatList(topSorted));
+    sortFirstPair(topSorted);
     topSorted = topSort(nodes);
     hasSortedTopN = topSorted
       .filter((v, i) => i < findTop)
