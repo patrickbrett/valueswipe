@@ -204,7 +204,7 @@ const cardRankHelper = async (
   nodes: Node[],
   topSorted: Node[][],
   findTop: number | null,
-  findTopOrdered: boolean
+  findTopOrdered: null | boolean
 ) => {
   if (findTop === null) {
     // Full sort
@@ -228,14 +228,14 @@ const cardRankHelper = async (
   }
 };
 
-const cardRank = async (values, findTop = null, findTopOrdered = true) => {
+const cardRank = async (values: string[], findTop: null | number = null, findTopOrdered: null | boolean = true) => {
   let nodes = values.map((val) => new Node(val));
 
-  await pairRankNodes(nodes, indexMap);
+  await pairRankNodes(nodes);
 
   let topSorted = topSort(nodes);
 
-  return cardRankHelper(nodes, topSorted, indexMap, findTop, findTopOrdered);
+  return cardRankHelper(nodes, topSorted, findTop, findTopOrdered);
 };
 
 const run = async () => {
@@ -251,8 +251,8 @@ const run = async () => {
 
   comparisons = 0;
 
-  const { nodes, topSorted, indexMap } = res1;
-  const res2 = await cardRankHelper(nodes, topSorted, indexMap, 3, true);
+  const { nodes, topSorted } = res1;
+  const res2 = await cardRankHelper(nodes, topSorted, 3, true);
 
   console.log(res2.ans);
 };
