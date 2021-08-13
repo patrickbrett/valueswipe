@@ -1,6 +1,6 @@
-const { shuffle } = require("fast-shuffle");
-const yaml = require("js-yaml");
-const fs = require("fs");
+import { shuffle } from "fast-shuffle";
+import yaml from "js-yaml";
+import fs from "fs";
 
 const readline = require("readline");
 
@@ -120,8 +120,8 @@ const pairRankNodes = async (nodes, indexMap) => {
 };
 
 const hasSplitAt = (splitNum, topSorted) => {
-  seenCount = 0;
-  for (group of topSorted) {
+  let seenCount = 0;
+  for (let group of topSorted) {
     seenCount += group.length;
     if (seenCount === splitNum) {
       return true;
@@ -149,7 +149,7 @@ const buildIndexMap = (vals) => {
   return indexMap;
 };
 
-const sortFirstPair = async (topSorted) => {
+const sortFirstPair = async (topSorted, indexMap) => {
   for (let rank of topSorted) {
     if (rank.length < 2) {
       continue;
@@ -159,21 +159,26 @@ const sortFirstPair = async (topSorted) => {
     break;
   }
   if (log) console.log(formatList(topSorted));
-}
+};
 
-const handleFullSort = async (nodes, topSorted) => {
+const handleFullSort = async (nodes, topSorted, indexMap) => {
   while (topSorted.length < nodes.length) {
     topSorted = shuffle(topSorted);
-    await sortFirstPair(topSorted);
+    await sortFirstPair(topSorted, indexMap);
     topSorted = topSort(nodes);
   }
   return topSorted;
 };
 
-const handleOrderedPartialSort = async (nodes, topSorted, findTop) => {
+const handleOrderedPartialSort = async (
+  nodes,
+  topSorted,
+  indexMap,
+  findTop
+) => {
   let hasSortedTopN = false;
   while (!hasSortedTopN) {
-    sortFirstPair(topSorted);
+    await sortFirstPair(topSorted, indexMap);
     topSorted = topSort(nodes);
     hasSortedTopN = topSorted
       .filter((v, i) => i < findTop)
@@ -183,7 +188,12 @@ const handleOrderedPartialSort = async (nodes, topSorted, findTop) => {
   return topSorted;
 };
 
-const handleUnorderedPartialSort = async (nodes, topSorted, indexMap, findTop) => {
+const handleUnorderedPartialSort = async (
+  nodes,
+  topSorted,
+  indexMap,
+  findTop
+) => {
   let hasIdentifiedTopN = false;
   while (!hasIdentifiedTopN) {
     let seenCount = 0;
@@ -201,6 +211,48 @@ const handleUnorderedPartialSort = async (nodes, topSorted, indexMap, findTop) =
     topSorted = topSort(nodes);
     hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
   }
+
+  return topSorted;
+};
+
+const cardRankHelper = async (
+  nodes,
+  topSorted,
+  indexMap,
+  findTop,
+  findTopOrdered
+) => {
+  if (findTop === null) {
+    // Full sort
+    topSorted = await handleFullSort(nodes, topSorted, indexMap);
+  } else if (findTopOrdered) {
+    // Find top N, ordered
+    topSorted = await handleOrderedPartialSort(
+      nodes,
+      topSorted,
+      indexMap,
+      findTop
+    );
+  } else {
+    // Find top N, unordered
+    topSorted = await handleUnorderedPartialSort(
+      nodes,
+      topSorted,
+      indexMap,
+      findTop
+    );
+  }
+
+  if (findTop === null) {
+    return { ans: formatList(topSorted), nodes, topSorted, indexMap };
+  } else {
+    return {
+      ans: formatList(topSorted).filter((v, i) => i < findTop),
+      nodes,
+      topSorted,
+      indexMap,
+    };
+  }
 };
 
 const cardRank = async (values, findTop = null, findTopOrdered = true) => {
@@ -212,33 +264,29 @@ const cardRank = async (values, findTop = null, findTopOrdered = true) => {
 
   let topSorted = topSort(nodes);
 
-  if (findTop === null) {
-    // Full sort
-    await handleFullSort(nodes, topSorted);
-  } else if (findTopOrdered) {
-    // Find top N, ordered
-    await handleOrderedPartialSort(nodes, topSorted, findTop);
-  } else {
-    // Find top N, unordered
-    await handleUnorderedPartialSort(nodes, topSorted, indexMap, findTop);
-  }
-
-  if (findTop === null) {
-    return formatList(topSorted);
-  } else {
-    return formatList(topSorted).filter((v, i) => i < findTop);
-  }
+  return cardRankHelper(nodes, topSorted, indexMap, findTop, findTopOrdered);
 };
 
-const { values } = yaml.load(fs.readFileSync("./values.yaml"));
-cardRank(
-  values.filter((v, i) => i < 10),
-  3,
-  false
-).then((res) => {
-  console.log(res);
+const run = async () => {
+  const { values } = yaml.load(fs.readFileSync("./values.yaml"));
+
+  const res1 = await cardRank(
+    values.filter((v, i) => i < 10),
+    3,
+    false
+  );
+  console.log(res1.ans);
   console.log(`Comps: ${comparisons}`);
-});
+
+  comparisons = 0;
+
+  const { nodes, topSorted, indexMap } = res1;
+  const res2 = await cardRankHelper(nodes, topSorted, indexMap, 3, true);
+
+  console.log(res2.ans);
+};
+
+run();
 
 /**
  * An idea: whittle down to the top 10 values,
@@ -251,4 +299,8 @@ cardRank(
 
 /**
  * Could be cool to show a graph illustrating the choices that were made and the ordering outcomes they resulted in.
+ */
+
+/**
+ * Build the site in typescript
  */
