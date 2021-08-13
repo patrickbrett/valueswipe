@@ -6,14 +6,17 @@ function App() {
   const [word1, setWord1] = useState("");
   const [word2, setWord2] = useState("");
   const [resolver, setResolver] = useState<(value: boolean) => void>(() => {});
+  const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
     const dispatcher = {
+      changeMessage: (message: string) => setMessage(message),
       ask: async (word1: string, word2: string) => {
         setWord1(word1);
         setWord2(word2);
-        const res = await new Promise<boolean>((resolve) => setResolver(() => resolve));
-        return res;
+        return await new Promise<boolean>((resolve) =>
+          setResolver(() => resolve)
+        );
       },
     };
 
@@ -24,6 +27,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
+        <p>{message}</p>
         <p>
           <button onClick={() => resolver(true)}>{word1}</button>
         </p>

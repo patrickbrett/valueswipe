@@ -1,6 +1,7 @@
 import { values } from "./values.json";
 
 interface Dispatcher {
+  changeMessage: (message: string) => void;
   ask: (word1: string, word2: string) => Promise<boolean>;
 }
 
@@ -280,17 +281,23 @@ const cardRank =
   };
 
 const run = async (dispatcher: Dispatcher) => {
+  dispatcher.changeMessage("Which value matters more to you?");
   const res1 = await cardRank(dispatcher)(values, 10, false);
-  console.log(res1.ans[0].join(","));
+  const topValues = res1.ans[0].join(", ");
   console.log(`Comps: ${comparisons}`);
+
+  dispatcher.changeMessage(
+    `Great, it looks like these are some of your top values: ${topValues}. Keep going to find out your top three!`
+  );
 
   comparisons = 0;
 
   const { nodes, topSorted } = res1;
   const res2 = await cardRankHelper(dispatcher)(nodes, topSorted, 3, true);
+  const topThree = res2.ans.join(', ');
   console.log(`Comps: ${comparisons}`);
 
-  console.log(res2.ans.join(","));
+    dispatcher.changeMessage(`Here's your top three: ${topThree}.`)
 };
 
 export default run;
