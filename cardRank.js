@@ -20,7 +20,7 @@ function askQuestion(query) {
 
 let comparisons = 0;
 const log = false;
-const ask = true;
+const ask = false;
 
 class Node {
   constructor(val) {
@@ -45,14 +45,14 @@ const compare = async (nodeA, nodeB, indexMap) => {
   comparisons++;
 
   let word1 = nodeA.val;
-  if (word1.includes('/')) {
-    word1 = shuffle(word1.split('/'))[0];
+  if (word1.includes("/")) {
+    word1 = shuffle(word1.split("/"))[0];
   }
   let word2 = nodeB.val;
-  if (word2.includes('/')) {
-    word2 = shuffle(word2.split('/'))[0];
+  if (word2.includes("/")) {
+    word2 = shuffle(word2.split("/"))[0];
   }
-  
+
   if (ask) {
     const ans = await askQuestion(
       `Which is more important to you - ${word1} (1) or ${word2} (2)? `
@@ -105,6 +105,42 @@ const formatList = (topSorted) => {
   return topSorted.map((x) => x.map((y) => y.val).join(","));
 };
 
+const pairRankNodes = async (nodes) => {
+  const len = nodes.length;
+  const shuffled = shuffle(nodes);
+
+  for (let i = 0; i < len; i += 2) {
+    if (i + 1 >= len) {
+      break;
+    }
+    const first = shuffled[i];
+    const second = shuffled[i + 1];
+    await handleComparison(first, second, indexMap);
+  }
+};
+
+const hasSplitAt = (splitNum, topSorted) => {
+  seenCount = 0;
+  for (group of topSorted) {
+    seenCount += group.length;
+    if (seenCount === splitNum) {
+      return true;
+    } else if (seenCount > splitNum) {
+      return false;
+    }
+  }
+};
+
+const handleComparison = async (first, second, indexMap) => {
+  if (await compare(first, second, indexMap)) {
+    first.o.add(second);
+    second.i.add(first);
+  } else {
+    first.i.add(second);
+    second.o.add(first);
+  }
+}
+
 const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
   indexMap = {};
   actualOrder.forEach((v, i) => {
@@ -113,21 +149,7 @@ const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
 
   let nodes = actualOrder.map((val) => new Node(val));
 
-  nodes = shuffle(nodes);
-  for (let i = 0; i < nodes.length; i += 2) {
-    if (i + 1 >= nodes.length) {
-      break;
-    }
-    const first = nodes[i];
-    const second = nodes[i + 1];
-    if (await compare(first, second, indexMap)) {
-      first.o.add(second);
-      second.i.add(first);
-    } else {
-      first.i.add(second);
-      second.o.add(first);
-    }
-  }
+  await pairRankNodes(nodes);
 
   let topSorted = topSort(nodes);
 
@@ -151,13 +173,7 @@ const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
         continue;
       }
       const [first, second] = rank;
-      if (await compare(first, second, indexMap)) {
-        first.o.add(second);
-        second.i.add(first);
-      } else {
-        first.i.add(second);
-        second.o.add(first);
-      }
+      await handleComparison(first, second, indexMap);
       break;
     }
     if (log) console.log(formatList(topSorted));
@@ -166,15 +182,7 @@ const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
       .filter((v, i) => i < findTop)
       .every((x) => x.length === 1);
 
-    hasIdentifiedTopN = false;
-    seenCount = 0;
-    for (let i=0; i<topSorted.length; i++) {
-      seenCount += topSorted[i].length;
-      if (seenCount === findTop) {
-        hasIdentifiedTopN = true;
-        break;
-      }
-    }
+    hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
   }
 
   if (findTop === null) {
@@ -185,7 +193,11 @@ const cardRank = async (actualOrder, findTop = null, findTopOrdered = true) => {
 };
 
 const { values } = yaml.load(fs.readFileSync("./values.yaml"));
-cardRank(values.filter((v, i) => i < 10), 3, false).then((res) => {
+cardRank(
+  values.filter((v, i) => i < 10),
+  3,
+  false
+).then((res) => {
   console.log(res);
   console.log(`Comps: ${comparisons}`);
 });
