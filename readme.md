@@ -1,4 +1,4 @@
-# Cardrank
+# ValueSwipe
 
 Currently a work in progress!
 
