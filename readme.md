@@ -13,7 +13,6 @@ Watch this space!
 ## Run it
 
 ```
-cd frontend
 npm i
 npm start
 ```
