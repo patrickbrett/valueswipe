@@ -1,10 +1,32 @@
-import { shuffle } from "fast-shuffle";
-import yaml from "js-yaml";
-import fs from "fs";
+import { values } from "./values.json";
+
+interface Dispatcher {
+  ask: (word1: string, word2: string) => Promise<boolean>;
+}
+
+const shuffle = <T>(array: T[]) => {
+  let currentIndex = array.length;
+  let randomIndex;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex],
+      array[currentIndex],
+    ];
+  }
+
+  return array;
+};
 
 let comparisons = 0;
 const log = true;
-const ask = false;
+const ask = true;
 
 class Node {
   val: string;
@@ -17,7 +39,7 @@ class Node {
   o3?: Set<Node>;
   i3?: Set<Node>;
 
-  constructor(val) {
+  constructor(val: string) {
     this.val = val;
     this.o = new Set();
     this.i = new Set();
@@ -34,28 +56,26 @@ const printNodeSet = (s: Set<Node>) => {
   return Array.from(s).map((s) => s.val);
 };
 
-const compare = async (nodeA: Node, nodeB: Node) => {
-  if (log) console.log(`Comparison: ${nodeA} vs ${nodeB}`);
-  comparisons++;
+const compare =
+  (dispatcher: Dispatcher) => async (nodeA: Node, nodeB: Node) => {
+    if (log) console.log(`Comparison: ${nodeA} vs ${nodeB}`);
+    comparisons++;
 
-  let word1 = nodeA.val;
-  if (word1.includes("/")) {
-    word1 = shuffle(word1.split("/"))[0];
-  }
-  let word2 = nodeB.val;
-  if (word2.includes("/")) {
-    word2 = shuffle(word2.split("/"))[0];
-  }
+    let word1 = nodeA.val;
+    if (word1.includes("/")) {
+      word1 = shuffle(word1.split("/"))[0];
+    }
+    let word2 = nodeB.val;
+    if (word2.includes("/")) {
+      word2 = shuffle(word2.split("/"))[0];
+    }
 
-  // if (ask) {
-  //   const ans = await askQuestion(
-  //     `Which is more important to you - ${word1} (1) or ${word2} (2)? `
-  //   );
-  //   return ans === "1";
-  // } else {
-  return true;
-  // }
-};
+    if (ask) {
+      return await dispatcher.ask(word1, word2);
+    } else {
+      return shuffle([true, false])[0];
+    }
+  };
 
 const topSort = (nodes: Node[]) => {
   nodes.forEach((node: Node) => {
@@ -96,10 +116,11 @@ const topSort = (nodes: Node[]) => {
 };
 
 const formatList = (topSorted: Node[][]) => {
-  return topSorted.map((x) => x.map((y) => y.val).join(","));
+  return topSorted.map((x) => x.map((y) => y.val));
 };
 
-const pairRankNodes = async (nodes: Node[]) => {
+const pairRankNodes = (dispatcher: Dispatcher) => async (nodes: Node[]) => {
+  console.log(nodes);
   const len = nodes.length;
   const shuffled = shuffle(nodes);
 
@@ -109,7 +130,7 @@ const pairRankNodes = async (nodes: Node[]) => {
     }
     const first = shuffled[i];
     const second = shuffled[i + 1];
-    await handleComparison(first, second);
+    await handleComparison(dispatcher)(first, second);
   }
 };
 
@@ -126,138 +147,153 @@ const hasSplitAt = (splitNum: number, topSorted: Node[][]) => {
   return false;
 };
 
-const handleComparison = async (first: Node, second: Node) => {
-  if (await compare(first, second)) {
-    first.o.add(second);
-    second.i.add(first);
-  } else {
-    first.i.add(second);
-    second.o.add(first);
-  }
-};
-
-const sortFirstPair = async (topSorted: Node[][]) => {
-  for (let rank of topSorted) {
-    if (rank.length < 2) {
-      continue;
+const handleComparison =
+  (dispatcher: Dispatcher) => async (first: Node, second: Node) => {
+    if (await compare(dispatcher)(first, second)) {
+      first.o.add(second);
+      second.i.add(first);
+    } else {
+      first.i.add(second);
+      second.o.add(first);
     }
-    const [first, second] = rank;
-    await handleComparison(first, second);
-    break;
-  }
-  if (log) console.log(formatList(topSorted));
-};
+  };
 
-const handleFullSort = async (nodes: Node[], topSorted: Node[][]) => {
-  while (topSorted.length < nodes.length) {
-    topSorted = shuffle(topSorted);
-    await sortFirstPair(topSorted);
-    topSorted = topSort(nodes);
-  }
-  return topSorted;
-};
-
-const handleOrderedPartialSort = async (
-  nodes: Node[],
-  topSorted: Node[][],
-  findTop: number
-) => {
-  let hasSortedTopN = false;
-  while (!hasSortedTopN) {
-    await sortFirstPair(topSorted);
-    topSorted = topSort(nodes);
-    hasSortedTopN = topSorted
-      .filter((v, i) => i < findTop)
-      .every((x) => x.length === 1);
-  }
-
-  return topSorted;
-};
-
-const handleUnorderedPartialSort = async (
-  nodes: Node[],
-  topSorted: Node[][],
-  findTop: number
-) => {
-  let hasIdentifiedTopN = false;
-  while (!hasIdentifiedTopN) {
-    let seenCount = 0;
+const sortFirstPair =
+  (dispatcher: Dispatcher) => async (topSorted: Node[][]) => {
     for (let rank of topSorted) {
-      seenCount += rank.length;
-      if (rank.length < 2 || seenCount < findTop) {
+      if (rank.length < 2) {
         continue;
       }
       const [first, second] = rank;
-      await handleComparison(first, second);
+      await handleComparison(dispatcher)(first, second);
       break;
     }
     if (log) console.log(formatList(topSorted));
+  };
 
-    topSorted = topSort(nodes);
-    hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
-  }
+const handleFullSort =
+  (dispatcher: Dispatcher) => async (nodes: Node[], topSorted: Node[][]) => {
+    while (topSorted.length < nodes.length) {
+      topSorted = shuffle(topSorted);
+      await sortFirstPair(dispatcher)(topSorted);
+      topSorted = topSort(nodes);
+    }
+    return topSorted;
+  };
 
-  return topSorted;
-};
+const handleOrderedPartialSort =
+  (dispatcher: Dispatcher) =>
+  async (nodes: Node[], topSorted: Node[][], findTop: number) => {
+    let hasSortedTopN = false;
+    while (!hasSortedTopN) {
+      await sortFirstPair(dispatcher)(topSorted);
+      topSorted = topSort(nodes);
+      hasSortedTopN = topSorted
+        .filter((v, i) => i < findTop)
+        .every((x) => x.length === 1);
+    }
 
-const cardRankHelper = async (
-  nodes: Node[],
-  topSorted: Node[][],
-  findTop: number | null,
-  findTopOrdered: null | boolean
-) => {
-  if (findTop === null) {
-    // Full sort
-    topSorted = await handleFullSort(nodes, topSorted);
-  } else if (findTopOrdered) {
-    // Find top N, ordered
-    topSorted = await handleOrderedPartialSort(nodes, topSorted, findTop);
-  } else {
-    // Find top N, unordered
-    topSorted = await handleUnorderedPartialSort(nodes, topSorted, findTop);
-  }
+    return topSorted;
+  };
 
-  if (findTop === null) {
-    return { ans: formatList(topSorted), nodes, topSorted };
-  } else {
-    return {
-      ans: formatList(topSorted).filter((v, i) => i < findTop),
+const handleUnorderedPartialSort =
+  (dispatcher: Dispatcher) =>
+  async (nodes: Node[], topSorted: Node[][], findTop: number) => {
+    let hasIdentifiedTopN = false;
+    while (!hasIdentifiedTopN) {
+      let seenCount = 0;
+      for (let rank of topSorted) {
+        seenCount += rank.length;
+        if (rank.length < 2 || seenCount < findTop) {
+          continue;
+        }
+        const [first, second] = rank;
+        await handleComparison(dispatcher)(first, second);
+        break;
+      }
+      if (log) console.log(formatList(topSorted));
+
+      topSorted = topSort(nodes);
+      hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
+    }
+
+    return topSorted;
+  };
+
+const cardRankHelper =
+  (dispatcher: Dispatcher) =>
+  async (
+    nodes: Node[],
+    topSorted: Node[][],
+    findTop: number | null,
+    findTopOrdered: null | boolean
+  ) => {
+    if (findTop === null) {
+      // Full sort
+      topSorted = await handleFullSort(dispatcher)(nodes, topSorted);
+    } else if (findTopOrdered) {
+      // Find top N, ordered
+      topSorted = await handleOrderedPartialSort(dispatcher)(
+        nodes,
+        topSorted,
+        findTop
+      );
+    } else {
+      // Find top N, unordered
+      topSorted = await handleUnorderedPartialSort(dispatcher)(
+        nodes,
+        topSorted,
+        findTop
+      );
+    }
+
+    if (findTop === null) {
+      return { ans: formatList(topSorted), nodes, topSorted };
+    } else {
+      return {
+        ans: formatList(topSorted).filter((v, i) => i < findTop),
+        nodes,
+        topSorted,
+      };
+    }
+  };
+
+const cardRank =
+  (dispatcher: Dispatcher) =>
+  async (
+    values: string[],
+    findTop: null | number = null,
+    findTopOrdered: null | boolean = true
+  ) => {
+    let nodes = values.map((val) => new Node(val));
+
+    await pairRankNodes(dispatcher)(nodes);
+
+    let topSorted = topSort(nodes);
+
+    return cardRankHelper(dispatcher)(
       nodes,
       topSorted,
-    };
-  }
-};
+      findTop,
+      findTopOrdered
+    );
+  };
 
-const cardRank = async (values: string[], findTop: null | number = null, findTopOrdered: null | boolean = true) => {
-  let nodes = values.map((val) => new Node(val));
-
-  await pairRankNodes(nodes);
-
-  let topSorted = topSort(nodes);
-
-  return cardRankHelper(nodes, topSorted, findTop, findTopOrdered);
-};
-
-const run = async () => {
-  const { values } = yaml.load(fs.readFileSync("./values.yaml"));
-
-  const res1 = await cardRank(
-    values.filter((v, i) => i < 10),
-    3,
-    false
-  );
-  console.log(res1.ans);
+const run = async (dispatcher: Dispatcher) => {
+  const res1 = await cardRank(dispatcher)(values, 10, false);
+  console.log(res1.ans[0].join(","));
   console.log(`Comps: ${comparisons}`);
 
   comparisons = 0;
 
   const { nodes, topSorted } = res1;
-  const res2 = await cardRankHelper(nodes, topSorted, 3, true);
+  const res2 = await cardRankHelper(dispatcher)(nodes, topSorted, 3, true);
+  console.log(`Comps: ${comparisons}`);
 
-  console.log(res2.ans);
+  console.log(res2.ans.join(","));
 };
 
-run();
+export default run;
 
 /**
  * An idea: whittle down to the top 10 values,
@@ -270,8 +306,4 @@ run();
 
 /**
  * Could be cool to show a graph illustrating the choices that were made and the ordering outcomes they resulted in.
- */
-
-/**
- * Build the site in typescript
  */
