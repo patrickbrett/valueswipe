@@ -9,7 +9,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {},
+  "dependencies": {
+    "@material-ui/core": "^4.12.3"
+  },
   "devDependencies": {
     "@types/react": "^17.0.17",
     "ts-node": "^10.2.0",

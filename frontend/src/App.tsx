@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import run from "./lib/rank";
 import "./App.css";
+import { Button } from "@material-ui/core";
 
 function App() {
   const [word1, setWord1] = useState("");
   const [word2, setWord2] = useState("");
   const [resolver, setResolver] = useState<(value: boolean) => void>(() => {});
   const [message, setMessage] = useState<string>("");
+  const [estRemaining, setEstRemaining] = useState(100);
 
   useEffect(() => {
     const dispatcher = {
@@ -18,6 +20,7 @@ function App() {
           setResolver(() => resolve)
         );
       },
+      updateEstRemaining: (count: number) => setEstRemaining(count)
     };
 
     run(dispatcher);
@@ -26,15 +29,18 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <p>{message}</p>
-        <p>
-          <button onClick={() => resolver(true)}>{word1}</button>
-        </p>
-        <p>
-          <button onClick={() => resolver(false)}>{word2}</button>
-        </p>
-      </header>
+      <p>{message}</p>
+      <div className="button-container">
+        <Button color="secondary" onClick={() => resolver(true)}>
+          {word1}
+        </Button>
+        <Button color="secondary" onClick={() => resolver(false)}>
+          {word2}
+        </Button>
+      </div>
+      {/* <p>
+        Est remaining: {estRemaining}
+      </p> */}
     </div>
   );
 }

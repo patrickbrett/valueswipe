@@ -3,6 +3,7 @@ import { values } from "./values.json";
 interface Dispatcher {
   changeMessage: (message: string) => void;
   ask: (word1: string, word2: string) => Promise<boolean>;
+  updateEstRemaining: (count: number) => void;
 }
 
 const shuffle = <T>(array: T[]) => {
@@ -78,7 +79,7 @@ const compare =
     }
   };
 
-const topSort = (nodes: Node[]) => {
+const topSort = (dispatcher: Dispatcher) => (nodes: Node[]) => {
   nodes.forEach((node: Node) => {
     node.i3 = new Set(Array.from(node.i));
     node.o3 = new Set(Array.from(node.o));
@@ -112,6 +113,8 @@ const topSort = (nodes: Node[]) => {
     delete node.i3;
     delete node.o3;
   });
+
+  getEstimatedRemainingSwipes(dispatcher)(topSorted, nodes);
 
   return topSorted;
 };
@@ -177,7 +180,7 @@ const handleFullSort =
     while (topSorted.length < nodes.length) {
       topSorted = shuffle(topSorted);
       await sortFirstPair(dispatcher)(topSorted);
-      topSorted = topSort(nodes);
+      topSorted = topSort(dispatcher)(nodes);
     }
     return topSorted;
   };
@@ -188,7 +191,7 @@ const handleOrderedPartialSort =
     let hasSortedTopN = false;
     while (!hasSortedTopN) {
       await sortFirstPair(dispatcher)(topSorted);
-      topSorted = topSort(nodes);
+      topSorted = topSort(dispatcher)(nodes);
       hasSortedTopN = topSorted
         .filter((v, i) => i < findTop)
         .every((x) => x.length === 1);
@@ -214,7 +217,7 @@ const handleUnorderedPartialSort =
       }
       if (log) console.log(formatList(topSorted));
 
-      topSorted = topSort(nodes);
+      topSorted = topSort(dispatcher)(nodes);
       hasIdentifiedTopN = hasSplitAt(findTop, topSorted);
     }
 
@@ -259,6 +262,11 @@ const cardRankHelper =
     }
   };
 
+const getEstimatedRemainingSwipes = (dispatcher: Dispatcher) => (topSorted: Node[][], nodes: Node[]) => {
+  const estRemaining = nodes.length - topSorted.length;
+  dispatcher.updateEstRemaining(estRemaining);
+}
+
 const cardRank =
   (dispatcher: Dispatcher) =>
   async (
@@ -270,7 +278,7 @@ const cardRank =
 
     await pairRankNodes(dispatcher)(nodes);
 
-    let topSorted = topSort(nodes);
+    let topSorted = topSort(dispatcher)(nodes);
 
     return cardRankHelper(dispatcher)(
       nodes,
@@ -297,7 +305,7 @@ const run = async (dispatcher: Dispatcher) => {
   const topThree = res2.ans.join(', ');
   console.log(`Comps: ${comparisons}`);
 
-    dispatcher.changeMessage(`Here's your top three: ${topThree}.`)
+    dispatcher.changeMessage(`Here's your top three: ${topThree}.`);
 };
 
 export default run;
